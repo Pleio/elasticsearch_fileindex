@@ -1,0 +1,17 @@
+version: 1.0
+rabbit:
+  connection:
+    host: localhost
+    port: 5672
+    username: ruben
+    password: ruben
+  vhost: pleio
+  queue: file_queue
+elasticsearch:
+  host: localhost
+  port: 9200
+  index: pleio
+#mappings:
+#  fulltext: fulltext
+#  metadata: metadata
+#  filename: filename
