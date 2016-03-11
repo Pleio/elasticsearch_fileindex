@@ -6,4 +6,5 @@ public class RabbitMQConnectionConfig
 	public String port;
 	public String username;
 	public String password;
+	public String vhost;
 }

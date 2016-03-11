@@ -5,12 +5,13 @@ rabbit:
     port: 5672
     username: ruben
     password: ruben
-  vhost: pleio
+    vhost: pleio
   queue: file_queue
 elasticsearch:
   host: localhost
   port: 9200
   index: pleio-dev-ruben
+pollinginterval: 10 # in seconds
 #mappings:
 #  fulltext: fulltext
 #  metadata: metadata

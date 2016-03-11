@@ -5,4 +5,5 @@ public class FileIndexerConfig
 	public String version;
 	public RabbitMQConfig rabbit;
 	public ElasticSearchConfig elasticsearch;
+	public long pollinginterval;
 }

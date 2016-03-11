@@ -33,7 +33,7 @@ public class FileIndexerTest
             assertEquals(expectedRabbitQueue, result.rabbit.queue);
 
             String expectedRabbitVhost = "pleio";
-            assertEquals(expectedRabbitVhost, result.rabbit.vhost);
+            assertEquals(expectedRabbitVhost, result.rabbit.connection.vhost);
 
             String expectedElasticHost = "localhost";
             assertEquals(expectedElasticHost, result.elasticsearch.host);
