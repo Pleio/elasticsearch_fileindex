@@ -2,3 +2,6 @@ target
 .idea
 file-indexer.iml
 resources/config.yml
+*.swp
+.vagrant
+*.log

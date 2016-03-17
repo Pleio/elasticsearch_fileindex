@@ -6,4 +6,5 @@ public class FileIndexerConfig
 	public RabbitMQConfig rabbit;
 	public ElasticSearchConfig elasticsearch;
 	public long pollinginterval;
+	public String log;
 }

@@ -9,10 +9,8 @@ rabbit:
   queue: file_queue
 elasticsearch:
   host: localhost
-  port: 9200
-  index: pleio-dev-ruben
+  port: 9300
+  cluster: elasticsearch # default is elasticsearch
+  index: pleio
 pollinginterval: 10 # in seconds
-#mappings:
-#  fulltext: fulltext
-#  metadata: metadata
-#  filename: filename
+log: log4j2.xml

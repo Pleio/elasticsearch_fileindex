@@ -1,32 +1,44 @@
 package nl.pleio.fileindexer;
 
 import nl.next2know.parsing.DocumentParser;
+import nl.next2know.parsing.ParserException;
+import nl.next2know.parsing.ParserResult;
 import nl.next2know.parsing.TikaDocumentParser;
 import nl.pleio.fileindexer.queue.QueueException;
 import nl.pleio.fileindexer.queue.QueueMessage;
 import nl.pleio.fileindexer.queue.QueueReaderService;
+
+import org.apache.logging.log4j.Logger;
 import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
+import nl.pleio.fileindexer.searchengine.*;
 import nl.pleio.fileindexer.config.*;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.LogManager;
+
+import java.io.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.HashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 public class FileIndexer
 {
     protected FileIndexerConfig config;
     protected QueueReaderService queueReader;
+    protected SearchEngineClientInterface searchClient;
+    protected Logger logger;
 
     public FileIndexer() {
     }
 
     public FileIndexer(String configPath) throws IOException {
         this.loadConfig(configPath);
+        this.setupLog();
     }
 
     public QueueReaderService getQueueReader() {
@@ -40,11 +52,10 @@ public class FileIndexer
     /**
      * Load the config YAML file and parse it into a FileIndexerConfig object.
      *
-     * @param configPath
+     * @param configPath Path to the main config file
      * @throws IOException
      */
-    protected FileIndexerConfig loadConfig(String configPath) throws IOException
-    {
+    protected FileIndexerConfig loadConfig(String configPath) throws IOException {
         Constructor constructor = new Constructor(FileIndexerConfig.class);
         TypeDescription fileIndexerConfigDesc = new TypeDescription(FileIndexerConfig.class);
         fileIndexerConfigDesc.putMapPropertyType("rabbit", RabbitMQConfig.class, Object.class);
@@ -58,6 +69,16 @@ public class FileIndexer
         configStream.close();
 
         return this.config;
+    }
+
+    /**
+     * Sets up Log4J to use the config file specified in our main config.yml
+     */
+    protected void setupLog() {
+        LoggerContext context = (LoggerContext) LogManager.getContext(false);
+        File logConfig = new File(this.config.log);
+        context.setConfigLocation(logConfig.toURI());
+        this.logger = LogManager.getLogger(FileIndexer.class.getName());
     }
 
     /**
@@ -81,41 +102,99 @@ public class FileIndexer
         return this.queueReader;
     }
 
+    /**
+     *
+     */
+    protected void disconnectFromRabbit() {
+        try {
+            this.queueReader.disconnect();
+        }
+        catch (IOException e) {
+            this.logger.error(e.getMessage());
+        }
+        catch (TimeoutException e) {
+            this.logger.error(e.getMessage());
+        }
+
+        this.queueReader = null;
+    }
+
+    protected SearchEngineClientInterface initSearchConnection() throws UnknownHostException {
+        if (this.searchClient != null) {
+            this.searchClient.disconnect();
+        }
+
+        HashMap<String, String> elasticSettings = new HashMap<String, String>();
+        elasticSettings.put("host", this.config.elasticsearch.host);
+        elasticSettings.put("port", Integer.toString(this.config.elasticsearch.port));
+        elasticSettings.put("cluster", this.config.elasticsearch.cluster);
+        elasticSettings.put("index", this.config.elasticsearch.index);
+        this.searchClient = new ElasticSearchClient(elasticSettings);
+        this.searchClient.connect();
+
+        return this.searchClient;
+    }
+
     public void processMessagesInQueue() {
 
         try {
             this.connectToRabbit();
+            this.logger.info("[Processing messages in queue]");
 
-            System.out.println("[Processing messages in queue]");
+            DocumentParser documentParser = new TikaDocumentParser();
+
             QueueMessage message;
+
+            this.initSearchConnection();
+
+            HashMap<String,Object> updateData;
             do {
                 message = this.getQueueReader().getNextMessage();
                 if (message != null) {
-                    System.out.println(message.id + " : " + message.filePath);
+                    this.logger.info(message.id + " : " + message.filePath);
+
+                    // Process the message
+                    InputStream inputFile = new FileInputStream(message.filePath);
+
+                    try {
+                        ParserResult result = documentParser.parse(inputFile);
+
+                        updateData = new HashMap<String,Object>();
+                        updateData.put("full_text", result.getBodyContent());
+                        updateData.put("needs_file_parsing", Boolean.valueOf(false));
+                        this.searchClient.updateDocument(message.id, "object", updateData);
+                    }
+                    catch (ParserException e) {
+                        this.logger.error(e.getMessage());
+                    }
+                    catch (IOException e) {
+                        this.logger.error(e.getMessage());
+                    }
+                    catch (ExecutionException e) {
+                        this.logger.error(e.getMessage());
+                    }
                 }
-                Thread.sleep(2000);
             }
             while (message != null);
 
-            System.out.println("[No more messages in queue]");
+            this.logger.info("[No more messages in queue]");
+
+            this.searchClient.disconnect();
+
 
             Thread.sleep(this.config.pollinginterval * 1000);
         }
         catch (IOException e) {
-            // @todo Log exception
-            e.printStackTrace();
+            this.logger.error(e.getMessage());
         }
         catch (TimeoutException e) {
-            // @todo Log exception
-            e.printStackTrace();
+            this.logger.error(e.getMessage());
         }
         catch (QueueException e) {
-            // @todo Log exception
-            e.printStackTrace();
+            this.logger.error(e.getMessage());
         }
         catch (InterruptedException e) {
-            // @todo Log exception
-            e.printStackTrace();
+            this.logger.error(e.getMessage());
         }
     }
 
@@ -126,7 +205,6 @@ public class FileIndexer
      */
     public static void main(String[] args) throws IOException {
         String configPath = "config.yml";
-        //String configPath = "./src/main/resources/config.yml";
         FileIndexer indexer = new FileIndexer(configPath);
 
         while (true) {
