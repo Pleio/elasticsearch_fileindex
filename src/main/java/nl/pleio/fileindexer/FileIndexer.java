@@ -88,7 +88,7 @@ public class FileIndexer
      * @throws TimeoutException
      */
     protected QueueReaderService connectToRabbit() throws IOException, TimeoutException {
-        if (this.queueReader == null) {
+        if (this.queueReader == null || this.queueReader.getConnection() == null) {
             this.queueReader = new QueueReaderService();
             this.queueReader.connect(
                 this.config.rabbit.connection.host,
@@ -135,7 +135,13 @@ public class FileIndexer
         return this.searchClient;
     }
 
-    public void processMessagesInQueue() {
+    /**
+     * Process messages in the queue until there are no more messages left.
+     * Return false on an abnormal event so the main method can abort the service.
+     *
+     * @return false on error, true on success
+     */
+    public boolean processMessagesInQueue() {
 
         try {
             this.connectToRabbit();
@@ -153,16 +159,19 @@ public class FileIndexer
                 if (message != null) {
                     this.logger.info(message.id + " : " + message.filePath);
 
-                    // Process the message
-                    InputStream inputFile = new FileInputStream(message.filePath);
-
                     try {
+                        // Process the message
+                        InputStream inputFile = new FileInputStream(message.filePath);
+
                         ParserResult result = documentParser.parse(inputFile);
 
                         updateData = new HashMap<String,Object>();
                         updateData.put("full_text", result.getBodyContent());
                         updateData.put("needs_file_parsing", Boolean.valueOf(false));
                         this.searchClient.updateDocument(message.id, "object", updateData);
+                    }
+                    catch (FileNotFoundException e) {
+                        this.logger.error(e.getMessage());
                     }
                     catch (ParserException e) {
                         this.logger.error(e.getMessage());
@@ -181,20 +190,27 @@ public class FileIndexer
 
             this.searchClient.disconnect();
 
+            this.disconnectFromRabbit();
 
             Thread.sleep(this.config.pollinginterval * 1000);
+
+            return true;
         }
         catch (IOException e) {
             this.logger.error(e.getMessage());
+            return false;
         }
         catch (TimeoutException e) {
             this.logger.error(e.getMessage());
+            return false;
         }
         catch (QueueException e) {
             this.logger.error(e.getMessage());
+            return false;
         }
         catch (InterruptedException e) {
             this.logger.error(e.getMessage());
+            return false;
         }
     }
 
@@ -205,10 +221,25 @@ public class FileIndexer
      */
     public static void main(String[] args) throws IOException {
         String configPath = "config.yml";
+
+        if (args.length >= 2) {
+            switch (args[0]) {
+                case "-c":
+                case "--config":
+                    configPath = args[1];
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        System.out.println("Using config path: " + configPath);
+
         FileIndexer indexer = new FileIndexer(configPath);
 
-        while (true) {
-            indexer.processMessagesInQueue();
+        boolean runningNormal = true;
+        while (true && runningNormal) {
+            runningNormal = indexer.processMessagesInQueue();
         }
     }
 }

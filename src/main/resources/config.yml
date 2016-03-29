@@ -1,0 +1,16 @@
+version: 1.0
+rabbit:
+  connection:
+    host: localhost
+    port: 5672
+    username: pleio
+    password: pleio
+    vhost: pleio
+  queue: file_queue
+elasticsearch:
+  host: 127.0.0.1
+  port: 9300
+  cluster: elasticsearch
+  index: pleio-dev-ruben
+pollinginterval: 10 # in seconds
+log: ./src/main/resources/log4j2.xml

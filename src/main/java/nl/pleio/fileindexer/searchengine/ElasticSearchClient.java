@@ -78,7 +78,10 @@ public class ElasticSearchClient extends SearchEngineClient
     public void connect() {
         this.disconnect();
 
-        Settings settings = ImmutableSettings.settingsBuilder().put("cluster.name", this.cluster).build();
+        Settings settings = ImmutableSettings.settingsBuilder()
+                            .put("cluster.name", this.cluster)
+                            .put("client.transport.sniff", true)
+                            .build();
         this.elasticClient = new TransportClient(settings).addTransportAddresses(
                 new InetSocketTransportAddress(this.host, this.port)
         );

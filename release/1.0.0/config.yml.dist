@@ -1,0 +1,16 @@
+version: 1.0
+rabbit:
+  connection:
+    host: localhost         # the hostname of the RabbitMQ server
+    port: 5672              # the port the RabbitMQ server is listening on (default: 5672)
+    username: pleio         # the RabbitMQ username
+    password: pleio         # the RabbitMQ password
+    vhost: pleio            # the RabbitMQ vhost
+  queue: file_queue         # the name of the queue in RabbitMQ, should match the value in Pleio config
+elasticsearch:
+  host: localhost           # the hostname of the ElasticSearch server
+  port: 9300                # the port the ElasticSearch server is listening on (default: 9300)
+  cluster: elasticsearch    # the ElasticSearch cluster (default: elasticsearch)
+  index: pleio              # the ElasticSearch index to use
+pollinginterval: 10         # how often to check for new messages in the queue
+log: log4j2.xml             # path to the log config file

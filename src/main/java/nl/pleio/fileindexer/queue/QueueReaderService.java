@@ -54,8 +54,25 @@ public class QueueReaderService
      */
     protected int deliveryTimeout = DEFAULT_DELIVERY_TIMEOUT;
 
+    /**
+     * Default constructor
+     */
     public QueueReaderService()
     {
+    }
+
+    /**
+     * @return
+     */
+    public Connection getConnection() {
+        return connection;
+    }
+
+    /**
+     * @param connection
+     */
+    public void setConnection(Connection connection) {
+        this.connection = connection;
     }
 
     /**
